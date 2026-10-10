@@ -27,8 +27,11 @@ MAX_RESIDUAL = 0.3     # m, a point this far from its line is ignored
 HUBER = 0.03           # m, points further off than this count for less
 ITERATIONS = 10        # upper limit, it normally stops earlier
 CONVERGED = 1e-5       # stop when the pose barely changes any more
-# how late a scan is compared to the IMU, measured in lidar_delay.py
-LIDAR_DELAY = 0.082
+# how late a scan is compared to the IMU. lidar_delay.py measures about
+# 0.082 s. I tried correcting for it, but against the odom -> base_link
+# ground truth it made no real difference (yaw error 0.09 deg without,
+# 0.10 deg with), so it is switched off. Put 0.082 here to turn it back on.
+LIDAR_DELAY = 0.0
 VELOCITY_SCANS = 4     # speed is taken over the last 4 scans (0.2 s)
 
 
@@ -131,8 +134,10 @@ def run(data):
     T, start, scan_t = data["T_base_lidar"], data["scan_start"], data["scan_t"]
     t, gyro, acc = data["imu_t"], data["imu_gyro"], data["imu_acc"]
     gyro_yaw, _ = yaw_from_gyro(t, gyro, standstill(t, gyro, acc))
-    # a scan stamped t shows the room as it was LIDAR_DELAY earlier, so I
-    # read the gyro at that earlier moment
+    # the next three lines are the delay handling. A scan stamped t shows
+    # the room as it was LIDAR_DELAY earlier, so the gyro is read at that
+    # earlier moment. With LIDAR_DELAY = 0 this is just the gyro heading
+    # at each scan and since_seen is all zeros.
     seen_yaw = np.interp(scan_t - LIDAR_DELAY, t, gyro_yaw)
     # how much the robot turned from one scan to the next
     turn = np.diff(seen_yaw, prepend=seen_yaw[0])
@@ -156,6 +161,7 @@ def run(data):
     # move every pose forward from "when the scan was really taken" to its
     # stamp: speed times delay for position, the gyro's turn for heading.
     # Only past scans are used, so this would also work running live.
+    # (With the delay at 0 this adds nothing and seen is returned as it is.)
     n = VELOCITY_SCANS
     velocity = np.zeros((len(scan_t), 2))
     velocity[n:] = (seen[n:, :2] - seen[:-n, :2]) / (scan_t[n:] - scan_t[:-n])[:, None]
