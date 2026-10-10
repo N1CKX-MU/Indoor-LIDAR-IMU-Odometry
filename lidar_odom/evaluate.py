@@ -14,8 +14,14 @@ import numpy as np
 
 
 def load(path):
-    """Read a t,x,y,yaw csv (works for both results and ground truth)."""
-    return np.loadtxt(path, delimiter=",", skiprows=1)
+    """Read a t,x,y,yaw_deg csv (works for both results and ground truth).
+
+    The files store yaw in degrees. Everything in here works in radians,
+    so I convert it once on the way in.
+    """
+    rows = np.loadtxt(path, delimiter=",", skiprows=1)
+    rows[:, 3] = np.radians(rows[:, 3])
+    return rows
 
 
 def match(est, gt, tolerance=1e-3):

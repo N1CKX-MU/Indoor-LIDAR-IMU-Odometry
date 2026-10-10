@@ -28,9 +28,11 @@ def main(name, cache_path="cache/sensors.npz", out_dir="results"):
 
     out_path = Path(out_dir) / f"{name}.csv"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    # one row per scan: time, x, y, yaw (radians). Same layout as gt.csv.
-    np.savetxt(out_path, np.column_stack([data["scan_t"], poses]),
-               delimiter=",", header="t,x,y,yaw", comments="", fmt="%.9f")
+    # one row per scan: time [s], x [m], y [m], yaw [deg]. Same layout as
+    # gt.csv. Inside the code yaw is always radians, it is only turned into
+    # degrees here because that is easier to read in the file.
+    np.savetxt(out_path, np.column_stack([data["scan_t"], poses[:, :2], np.degrees(poses[:, 2])]),
+               delimiter=",", header="t,x,y,yaw_deg", comments="", fmt="%.9f")
     x, y, yaw = poses[-1]
     print(f"{name}: {len(poses)} poses in {seconds:.2f} s "
           f"({len(poses) / seconds:.0f} Hz)")
