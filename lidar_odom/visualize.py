@@ -1,4 +1,9 @@
-"""Plot the raw sensor data in cache/sensors.npz as a sanity check."""
+"""Plot the raw sensor data in cache/sensors.npz as a sanity check.
+
+I wrote this before any algorithm, just to look at what the lidar and the
+imu actually give. Most of the later decisions (cut the floor, cut the robot
+body, use a map and not scan to scan) came from staring at these two plots.
+"""
 import sys
 from pathlib import Path
 
@@ -15,11 +20,20 @@ def get_scan(data, i):
 
 
 def plot_scans(data, out_dir, n_accumulate=20, near=1.5):
+    """Four views of the point cloud: one scan, 20 scans, side view, close up.
+
+    Stacking the first 20 scans is only ok because the robot is not moving
+    yet at the start of the bag. One Livox scan on its own is quite sparse,
+    the pattern lands on different spots every time, so 20 together show
+    the room much better.
+    """
     one = get_scan(data, 0)
     many = np.concatenate([get_scan(data, i) for i in range(n_accumulate)])
+    # the close up is there to see the robot's own body in the scan
     close = many[np.linalg.norm(many[:, :2], axis=1) < near]
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    # (axis, points, column for x axis, column for y axis, aspect, title)
     panels = [
         (axes[0, 0], one, 0, 1, "equal", "One scan (50 ms), top view"),
         (axes[0, 1], many, 0, 1, "equal", f"First {n_accumulate} scans, top view"),
@@ -27,6 +41,7 @@ def plot_scans(data, out_dir, n_accumulate=20, near=1.5):
         (axes[1, 1], close, 0, 1, "equal", f"Points within {near} m, top view"),
     ]
     for ax, pts, a, b, aspect, title in panels:
+        # colour by height so floor and walls are easy to tell apart
         sc = ax.scatter(pts[:, a], pts[:, b], c=pts[:, 2], s=1,
                         cmap="viridis", vmin=-2, vmax=2)
         ax.plot(0, 0, "r+", markersize=12)  # the sensor
@@ -41,6 +56,12 @@ def plot_scans(data, out_dir, n_accumulate=20, near=1.5):
 
 
 def plot_imu(data, out_dir):
+    """Gyro on top, accelerometer below, all three axes each.
+
+    What I was looking for: when does the robot start moving (about 16 s in),
+    which axis it turns about (only z), and how noisy the accelerometer is
+    (very, it spikes every time the robot starts or stops).
+    """
     t = data["imu_t"] - data["imu_t"][0]
     fig, (ax_g, ax_a) = plt.subplots(2, 1, figsize=(12, 7), sharex=True)
     for k, name in enumerate("xyz"):
@@ -67,6 +88,8 @@ def main(cache_path, out_dir):
     plot_scans(data, out_dir)
     plot_imu(data, out_dir)
 
+    # a few numbers to go with the pictures. Points closer than 1 m turned
+    # out to be the robot itself.
     sizes = np.diff(data["scan_start"])
     ranges = np.linalg.norm(get_scan(data, 0), axis=1)
     print(f"points per scan: min {sizes.min()}, max {sizes.max()}")
