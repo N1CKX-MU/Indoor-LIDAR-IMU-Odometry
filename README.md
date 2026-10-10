@@ -55,6 +55,33 @@ uses the first pose alignment.
 
 Nearly all of the error is in the two turns (around 27-35 s and 94-100 s).
 
+### Side by side with the ground truth
+
+![my odometry next to ground truth](figures/comparison.gif)
+
+Left: every scan's wall points placed in the room using my pose for that
+scan, with my path in orange. Right: the same points placed using the
+ground-truth pose. If my poses were off, the walls on the left would smear
+or drift away from the picture on the right. The line at the top shows the
+error at that moment.
+
+### The trajectory file
+
+`results/wall_icp.csv` is what I submit. One row per LiDAR scan:
+
+| column | meaning |
+|---|---|
+| `t` | scan time from the message header [s] |
+| `x`, `y` | position of `base_link` [m] |
+| `yaw_deg` | heading of `base_link` [degrees], not wrapped |
+
+**The trajectory starts at (0, 0) facing 0 deg**, because an odometry has no
+way of knowing where the ground-truth frame puts its origin. The ground truth
+starts at (-0.007, -0.066) facing -1.585 deg. So the two have to be lined up
+before they are compared, either at the first pose or by a best fit over the
+whole path. Subtracting the files directly would mostly measure that offset.
+`evaluate.py` does both alignments.
+
 ## Setup
 
 I used Python 3.11 on Windows. No ROS is needed, the bag is read with the
@@ -83,7 +110,7 @@ All commands are run from the repo root.
     .venv\Scripts\python -m lidar_odom.extract_gt data\rosbag cache\gt.csv
 
 **3. Run a method.** This writes `results/<name>.csv` with one row per scan
-(`t, x, y, yaw`, yaw in radians) and prints the speed:
+(`t, x, y, yaw_deg`) and prints the speed:
 
     .venv\Scripts\python -m lidar_odom.run wall_icp
 
@@ -114,6 +141,10 @@ Rebuild the GIF at the top of this page:
 
     .venv\Scripts\python -m lidar_odom.make_gif cache\sensors.npz figures\playback.gif
 
+Rebuild the side by side comparison with the ground truth:
+
+    .venv\Scripts\python -m lidar_odom.make_comparison wall_icp figures\comparison.gif
+
 Measure the LiDAR's time lag behind the IMU (see the note on timing below):
 
     .venv\Scripts\python -m lidar_odom.lidar_delay
@@ -130,6 +161,7 @@ Measure the LiDAR's time lag behind the IMU (see the note on timing below):
       evaluate.py       ATE, yaw error and the plots
       view3d.py         3D playback of the run
       make_gif.py       the same playback saved as a GIF
+      make_comparison.py  my odometry next to ground truth, as a GIF
       lidar_delay.py    measures the lidar/imu time offset
       algos/
         wall_icp.py     my method: point-to-line ICP against a wall map
@@ -162,7 +194,8 @@ I built these to have something to compare against.
 ## Ground truth
 
 The bag contains ground truth. It is read by `extract_gt.py` and opened only
-by `evaluate.py`. None of the methods load it; they only ever see
+by `evaluate.py` and `make_comparison.py`, which are both for checking the
+result. None of the methods load it; they only ever see
 `cache/sensors.npz`, which has no ground truth in it.
 
 There are actually two copies in the bag, `/odom_sim` and the
