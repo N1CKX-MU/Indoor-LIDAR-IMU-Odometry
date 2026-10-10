@@ -3,3 +3,4 @@ rosbags
 matplotlib
 open3d
 scipy
+kiss-icp
